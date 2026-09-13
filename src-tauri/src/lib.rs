@@ -24,6 +24,7 @@ pub fn run() {
             commands::import_export::import_zip,
             commands::import_export::export_note,
             commands::import_export::export_zip,
+            commands::system::reveal_in_file_manager,
             watcher::watch_workspace,
             watcher::unwatch_workspace,
         ])

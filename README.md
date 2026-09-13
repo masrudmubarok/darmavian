@@ -5,13 +5,14 @@ Offline Markdown knowledge-management desktop app (Tauri 2 + React + Rust). File
 ## What works today
 
 - **Workspace** — open any local folder as a workspace (native folder picker); sidebar header shows the open folder's name; the last opened workspace reopens automatically on the next launch (remembered in `localStorage`, not synced anywhere).
-- **Explorer** — real filesystem tree (folders 📁/📂, notes 📄), expand/collapse, right-click New Note / New Folder / Rename / Move to… / Delete (moves to system Trash), drag-and-drop to move a note or folder (including dropping onto the empty sidebar area to move to the workspace root), a themed modal for name input (no native `prompt()`), tooltip on truncated names.
+- **Explorer** — real filesystem tree (folders 📁/📂, notes 📄), expand/collapse, right-click New Note / New Folder / Show in Explorer / Move to… / Rename / Delete (moves to system Trash), drag-and-drop to move a note or folder (including dropping onto the empty sidebar area to move to the workspace root), a themed modal for name input (no native `prompt()`), tooltip on truncated names.
 - **Live file sync** — the sidebar reflects changes made outside the app (new/renamed/deleted files from Explorer, VS Code, git, …) automatically, via a Rust file watcher. If the file behind your *currently open* note changes externally, it's silently reloaded when you have no unsaved edits, or you get a "File changed externally" dialog (Reload / Keep Current / Compare) when you do.
 - **Editor** — CodeMirror 6 in an Obsidian-style *Live Preview* mode: Markdown syntax (`**bold**`, `# heading`, `` `code` ``, blockquotes, lists) is styled and its markup hidden while the cursor is elsewhere, and shown raw when editing that spot. Autosave (debounced, atomic temp-file+rename writes), undo/redo, in-document search (Ctrl+F), `[[Wiki Link]]` autocomplete against the workspace's notes, Saving…/Saved ✓/Save failed ⚠ status, word + character count.
 - **Preview** — Editor / Split / Preview toggle. Split mode keeps both panes scrolled to the same source line (not just the same scroll %). Renders GFM tables (with their own horizontal scrollbar, not the whole page), syntax-highlighted code blocks, Mermaid diagrams (fixed light card + mermaid's "neutral" theme, independent of the app's own dark/light mode), and local images referenced from a note (resolved relative to the note's own folder).
 - **Import / Export** — import loose `.md`/`.txt` files, a whole folder (hierarchy preserved), or a `.zip` (path-traversal-checked on extraction) into any folder; export a single note, or a folder/whole workspace as a `.zip`.
 - **Theming** — light (default) / dark toggle, consistent across the editor, preview, and Mermaid diagrams.
-- **Packaging** — `npm run tauri build` produces a working `.msi` and NSIS `.exe` installer.
+- **Window** — frameless, custom titlebar (sidebar toggle, theme toggle, minimize/maximize/close — no OS-native title bar or app name/logo shown, that's redundant with the taskbar icon); opens maximized by default.
+- **Packaging** — `npm run tauri build` produces a working `.msi` and NSIS `.exe` installer, both carrying the app's own icon and installer wizard artwork (not the Tauri/NSIS defaults).
 
 ## Not built yet
 
@@ -59,23 +60,24 @@ The unpackaged executable also exists on its own at `src-tauri/target/release/da
 - Build fails immediately with a `cargo`/`link.exe` error → the MSVC C++ Build Tools aren't installed (see Prerequisites); Rust needs them to link on Windows.
 - Icon looks unchanged after rebuilding new `.ico`/`.png` files under `src-tauri/icons/` → Cargo may not detect the asset change; force it with `touch src-tauri/build.rs` (or just edit-and-save that file) before rebuilding. Windows also caches taskbar/exe icons aggressively — an Explorer restart or logoff may be needed to actually see it.
 - Want a smaller/faster build for local testing only (skip installer packaging) → `npm run tauri build -- --debug`, or `cd src-tauri && cargo build` for just the Rust binary.
+- A blank console window pops up alongside the app → that's expected for `--debug`/`cargo build` (so `println!`/panics are visible); it's suppressed in an actual `npm run tauri build` release build (`main.rs` sets `windows_subsystem = "windows"` when `not(debug_assertions)`). If a *release* build still shows one, something's wrong — it shouldn't.
 
 ## Project layout
 
 ```
 src/
-  components/     shared UI (PromptModal, ConflictModal)
+  components/     shared UI (PromptModal, ConflictModal, WindowControls)
   features/
     explorer/     workspace tree (incl. drag-and-drop move), context menu, new-item/import menu
     editor/       CodeMirror + Live Preview decorations, search, wiki-link autocomplete,
                   tabs, status bar, scroll-sync
     preview/      markdown-it renderer (+ image resolution) and Mermaid
-  services/       note/folder/workspace/asset/importExport services → tauriClient (Tauri IPC boundary)
+  services/       note/folder/workspace/asset/importExport/system services → tauriClient (Tauri IPC boundary)
   stores/         Zustand: workspace / editor (incl. external-change detection) / ui
   utils/          tree flattening (wiki-link source list), relative-path resolution
 src-tauri/
   src/
-    commands/     Tauri commands (workspace, note, folder, entry, asset, import_export)
+    commands/     Tauri commands (workspace, note, folder, entry, asset, import_export, system)
     filesystem/   tree walk, atomic writes, recursive copy
     security/     filename sanitization, path-traversal guards
     watcher/      notify-based file watcher → "workspace://changed" event

@@ -2,6 +2,10 @@ node_modules
 dist
 dist-ssr
 *.local
+*.tsbuildinfo
+npm-debug.log*
+.env
+.env.*
 
 # Rust / Tauri
 src-tauri/target
@@ -12,3 +16,5 @@ src-tauri/gen
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
+desktop.ini

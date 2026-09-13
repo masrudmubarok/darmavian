@@ -76,7 +76,7 @@ Checklist against [darmavian_implementation_plan_design.md](darmavian_implementa
 - ✅ Tabbed editor view
 - ❌ Settings panel
 - ✅ Dark / light themes
-- ✅ Application packaging & installer (`.msi` + NSIS `.exe` via `tauri build`)
+- ✅ Application packaging & installer (`.msi` + NSIS `.exe` via `tauri build`), including the installer's own icon and wizard artwork (not Tauri/NSIS's generic defaults)
 
 ## Phase 9 — Advanced Features (Post-MVP)
 
@@ -105,3 +105,5 @@ Correctly untouched — plan explicitly scopes these to after MVP is stable.
 - Folder vs. note icons + tooltip on truncated Explorer names
 - New-item ("+") menu next to "Open…", now also carrying Import/Export
 - Last-opened workspace auto-reopens on launch (`localStorage`, per-machine — not part of plan §13)
+- "Show in Explorer" context-menu item (reveals a note/folder in the OS file manager; Windows/macOS/Linux, spawned directly rather than via a shell)
+- Frameless window with a custom titlebar (sidebar toggle, theme toggle, minimize/maximize/close) instead of the OS-native one; opens maximized by default

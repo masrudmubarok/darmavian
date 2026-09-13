@@ -46,4 +46,7 @@ export const tauriClient = {
 
   exportZip: (sourceFolder: string, destZipPath: string) =>
     invoke<void>("export_zip", { sourceFolder, destZipPath }),
+
+  revealInFileManager: (path: string) =>
+    invoke<void>("reveal_in_file_manager", { path }),
 };

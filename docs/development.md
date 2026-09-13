@@ -47,25 +47,30 @@ Any new Rust command that takes a path or filename **must** go through `security
 
 ```
 src/
-  components/          Shared UI with no feature ownership (PromptModal)
+  components/          Shared UI with no feature ownership (PromptModal, ConflictModal, WindowControls)
   features/
-    explorer/          Workspace tree, right-click menu, "+" new-item menu
-    editor/            CodeMirror wrapper, Live Preview decorations, tabs, status bar,
-                        the Editor/Split/Preview toggle, and scroll-sync plumbing
-    preview/           markdown-it renderer + Mermaid rendering
-  services/            One file per domain (note/folder/workspace) + tauriClient.ts
-  stores/              Zustand: workspaceStore, editorStore, uiStore
+    explorer/          Workspace tree (incl. drag-and-drop move), right-click menu, "+" new-item menu
+    editor/            CodeMirror wrapper, Live Preview decorations, search, wiki-link
+                        autocomplete, tabs, status bar, the Editor/Split/Preview toggle,
+                        and scroll-sync plumbing
+    preview/           markdown-it renderer (+ image resolution) + Mermaid rendering
+  services/            One file per domain (note/folder/workspace/asset/importExport/system) + tauriClient.ts
+  stores/              Zustand: workspaceStore, editorStore (incl. external-change detection), uiStore
   types/workspace.ts   Shared domain types (WorkspaceNode, Note, Tag, NoteLink)
+  utils/               Tree flattening (wiki-link source list), relative-path resolution
   styles.css           All CSS: theme tokens, prose/typography, hljs palette
 
 src-tauri/src/
-  commands/            One #[tauri::command] file per domain (workspace/note/folder/entry)
-  filesystem/          Directory tree walk, atomic write helper
+  commands/            One #[tauri::command] file per domain (workspace/note/folder/entry/
+                        asset/import_export/system)
+  filesystem/          Directory tree walk, atomic write helper, recursive copy
   security/            Filename sanitization + path-traversal guard — the only place
                         that's allowed to build a filesystem path from user input
   watcher/             notify-based file watcher, emits "workspace://changed"
   lib.rs               Builder setup: plugins, managed state, invoke_handler registration
 ```
+
+The window itself is frameless (`decorations: false` in `tauri.conf.json`) — the titlebar you see (sidebar toggle, theme toggle, drag region, window controls) is plain React/HTML in `App.tsx` + `WindowControls.tsx`, not OS chrome. A `data-tauri-drag-region` div makes the empty middle area draggable/double-click-to-maximize; don't put interactive controls inside it.
 
 ## State management
 

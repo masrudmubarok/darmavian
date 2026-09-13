@@ -6,6 +6,7 @@ import { useEditorStore } from "@/stores/editorStore";
 import { noteService } from "@/services/noteService";
 import { folderService } from "@/services/folderService";
 import { importExportService } from "@/services/importExportService";
+import { systemService } from "@/services/systemService";
 import { PromptModal } from "@/components/PromptModal";
 
 function parentOf(path: string): string {
@@ -145,6 +146,13 @@ export function ContextMenu() {
             <div className="my-1 border-t border-border" />
           </>
         )}
+        <MenuItem
+          label="Show in Explorer"
+          onClick={() => {
+            close();
+            void systemService.revealInFileManager(menu.path).catch((err) => setBusyError(String(err)));
+          }}
+        />
         <MenuItem
           label="Move to…"
           onClick={async () => {
