@@ -1,7 +1,7 @@
-use crate::filesystem;
+use crate::filesystem::{self, unique_path};
 use crate::security::{join_within, sanitize_filename};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[tauri::command]
 pub fn read_note(path: String) -> Result<String, String> {
@@ -28,26 +28,4 @@ pub fn create_note(folder_path: String, title: String) -> Result<String, String>
 
     fs::File::create(&final_path).map_err(|e| format!("Cannot create note: {e}"))?;
     Ok(final_path.to_string_lossy().to_string())
-}
-
-fn unique_path(path: &Path) -> PathBuf {
-    if !path.exists() {
-        return path.to_path_buf();
-    }
-    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("Untitled");
-    let ext = path.extension().and_then(|s| s.to_str());
-    let parent = path.parent().unwrap_or_else(|| Path::new("."));
-
-    let mut counter = 2;
-    loop {
-        let candidate_name = match ext {
-            Some(ext) => format!("{stem} {counter}.{ext}"),
-            None => format!("{stem} {counter}"),
-        };
-        let candidate = parent.join(candidate_name);
-        if !candidate.exists() {
-            return candidate;
-        }
-        counter += 1;
-    }
 }

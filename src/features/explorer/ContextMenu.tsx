@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
 import { useUiStore } from "@/stores/uiStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useEditorStore } from "@/stores/editorStore";
 import { noteService } from "@/services/noteService";
 import { folderService } from "@/services/folderService";
+import { importExportService } from "@/services/importExportService";
 import { PromptModal } from "@/components/PromptModal";
 
 function parentOf(path: string): string {
   const idx = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
   return idx === -1 ? path : path.slice(0, idx);
+}
+
+function baseName(path: string): string {
+  return path.split(/[\\/]/).pop() ?? path;
 }
 
 type PendingAction =
@@ -63,84 +69,151 @@ export function ContextMenu() {
     setPending(null);
   };
 
+  if (!menu) {
+    return pending ? <PendingActionModal pending={pending} onConfirm={handleConfirm} onCancel={() => setPending(null)} /> : null;
+  }
+
+  const targetFolder = menu.kind === "folder" ? menu.path : parentOf(menu.path);
+
   return (
     <>
-      {menu && (
-        <div
-          ref={ref}
-          style={{ top: menu.y, left: menu.x }}
-          className="fixed z-50 min-w-[180px] rounded-md border border-border bg-surface py-1 shadow-lg"
-        >
-          {busyError && (
-            <div className="border-b border-border px-3 py-1.5 text-xs text-red-400">
-              {busyError}
-            </div>
-          )}
-          <MenuItem
-            label="New Note"
-            onClick={() => {
-              setPending({
-                kind: "newNote",
-                targetFolder: menu.kind === "folder" ? menu.path : parentOf(menu.path),
-              });
-              close();
-            }}
-          />
-          <MenuItem
-            label="New Folder"
-            onClick={() => {
-              setPending({
-                kind: "newFolder",
-                targetFolder: menu.kind === "folder" ? menu.path : parentOf(menu.path),
-              });
-              close();
-            }}
-          />
-          <div className="my-1 border-t border-border" />
-          <MenuItem
-            label="Rename"
-            onClick={() => {
-              setPending({
-                kind: "rename",
-                path: menu.path,
-                isFolder: menu.kind === "folder",
-                currentName: menu.path.split(/[\\/]/).pop() ?? "",
-              });
-              close();
-            }}
-          />
-          <MenuItem
-            label="Delete"
-            onClick={() =>
-              run(async () => {
-                const ok = window.confirm(`Move "${menu.path.split(/[\\/]/).pop()}" to Trash?`);
-                if (!ok) return;
-                if (menu.kind === "note") {
-                  await noteService.remove(menu.path);
-                  closeTab(menu.path);
-                } else {
-                  await folderService.remove(menu.path);
-                }
+      <div
+        ref={ref}
+        style={{ top: menu.y, left: menu.x }}
+        className="fixed z-50 min-w-[190px] rounded-md border border-border bg-surface py-1 shadow-lg"
+      >
+        {busyError && (
+          <div className="border-b border-border px-3 py-1.5 text-xs text-red-400">{busyError}</div>
+        )}
+        <MenuItem
+          label="New Note"
+          onClick={() => {
+            setPending({ kind: "newNote", targetFolder });
+            close();
+          }}
+        />
+        <MenuItem
+          label="New Folder"
+          onClick={() => {
+            setPending({ kind: "newFolder", targetFolder });
+            close();
+          }}
+        />
+        <div className="my-1 border-t border-border" />
+        {menu.kind === "folder" && (
+          <>
+            <MenuItem
+              label="Import Files…"
+              onClick={() => {
                 close();
-              })
-            }
-          />
-        </div>
-      )}
+                void run(() => importExportService.importFiles(targetFolder).then(() => {}));
+              }}
+            />
+            <MenuItem
+              label="Import Folder…"
+              onClick={() => {
+                close();
+                void run(() => importExportService.importFolder(targetFolder).then(() => {}));
+              }}
+            />
+            <MenuItem
+              label="Import ZIP…"
+              onClick={() => {
+                close();
+                void run(() => importExportService.importZip(targetFolder).then(() => {}));
+              }}
+            />
+            <MenuItem
+              label="Export as ZIP…"
+              onClick={() => {
+                close();
+                void importExportService.exportZip(menu.path, baseName(menu.path)).catch((err) => setBusyError(String(err)));
+              }}
+            />
+            <div className="my-1 border-t border-border" />
+          </>
+        )}
+        {menu.kind === "note" && (
+          <>
+            <MenuItem
+              label="Export Note…"
+              onClick={() => {
+                close();
+                void importExportService.exportNote(menu.path).catch((err) => setBusyError(String(err)));
+              }}
+            />
+            <div className="my-1 border-t border-border" />
+          </>
+        )}
+        <MenuItem
+          label="Move to…"
+          onClick={async () => {
+            close();
+            const destination = await open({ directory: true, multiple: false });
+            if (!destination || Array.isArray(destination)) return;
+            await run(async () => {
+              if (menu.kind === "folder") await folderService.move(menu.path, destination);
+              else await noteService.move(menu.path, destination);
+            });
+          }}
+        />
+        <MenuItem
+          label="Rename"
+          onClick={() => {
+            setPending({
+              kind: "rename",
+              path: menu.path,
+              isFolder: menu.kind === "folder",
+              currentName: menu.path.split(/[\\/]/).pop() ?? "",
+            });
+            close();
+          }}
+        />
+        <MenuItem
+          label="Delete"
+          onClick={() =>
+            run(async () => {
+              const ok = window.confirm(`Move "${menu.path.split(/[\\/]/).pop()}" to Trash?`);
+              if (!ok) return;
+              if (menu.kind === "note") {
+                await noteService.remove(menu.path);
+                closeTab(menu.path);
+              } else {
+                await folderService.remove(menu.path);
+              }
+              close();
+            })
+          }
+        />
+      </div>
 
       {pending && (
-        <PromptModal
-          title={pending.kind === "newNote" ? "New Note" : pending.kind === "newFolder" ? "New Folder" : "Rename"}
-          label={pending.kind === "newNote" ? "Note title" : pending.kind === "newFolder" ? "Folder name" : "New name"}
-          defaultValue={
-            pending.kind === "newNote" ? "Untitled" : pending.kind === "newFolder" ? "New Folder" : pending.currentName
-          }
-          confirmLabel={pending.kind === "rename" ? "Rename" : "Create"}
-          onConfirm={handleConfirm}
-          onCancel={() => setPending(null)}
-        />
+        <PendingActionModal pending={pending} onConfirm={handleConfirm} onCancel={() => setPending(null)} />
       )}
     </>
+  );
+}
+
+function PendingActionModal({
+  pending,
+  onConfirm,
+  onCancel,
+}: {
+  pending: PendingAction;
+  onConfirm: (value: string) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <PromptModal
+      title={pending.kind === "newNote" ? "New Note" : pending.kind === "newFolder" ? "New Folder" : "Rename"}
+      label={pending.kind === "newNote" ? "Note title" : pending.kind === "newFolder" ? "Folder name" : "New name"}
+      defaultValue={
+        pending.kind === "newNote" ? "Untitled" : pending.kind === "newFolder" ? "New Folder" : pending.currentName
+      }
+      confirmLabel={pending.kind === "rename" ? "Rename" : "Create"}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    />
   );
 }
 

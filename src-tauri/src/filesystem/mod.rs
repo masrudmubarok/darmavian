@@ -1,7 +1,7 @@
 use serde::Serialize;
 use std::fs;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Serialize, Clone)]
 #[serde(tag = "type", rename_all = "lowercase")]
@@ -82,4 +82,42 @@ pub fn atomic_write(path: &Path, content: &str) -> Result<(), String> {
         let _ = fs::remove_file(&tmp_path);
         format!("Failed to save file: {e}")
     })
+}
+
+pub fn unique_path(path: &Path) -> PathBuf {
+    if !path.exists() {
+        return path.to_path_buf();
+    }
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("Untitled");
+    let ext = path.extension().and_then(|s| s.to_str());
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+
+    let mut counter = 2;
+    loop {
+        let candidate_name = match ext {
+            Some(ext) => format!("{stem} {counter}.{ext}"),
+            None => format!("{stem} {counter}"),
+        };
+        let candidate = parent.join(candidate_name);
+        if !candidate.exists() {
+            return candidate;
+        }
+        counter += 1;
+    }
+}
+
+pub fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
+    fs::create_dir_all(dst).map_err(|e| format!("Cannot create {}: {e}", dst.display()))?;
+    for entry in fs::read_dir(src).map_err(|e| format!("Cannot read {}: {e}", src.display()))? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let from = entry.path();
+        let to = dst.join(entry.file_name());
+        let metadata = entry.metadata().map_err(|e| e.to_string())?;
+        if metadata.is_dir() {
+            copy_dir_recursive(&from, &to)?;
+        } else {
+            fs::copy(&from, &to).map_err(|e| format!("Cannot copy {}: {e}", from.display()))?;
+        }
+    }
+    Ok(())
 }

@@ -13,16 +13,13 @@ const DEBOUNCE_MS: u64 = 400;
 
 type WatcherHandle = Debouncer<notify::RecommendedWatcher>;
 
-/// Holds the currently active watcher, if any. Replacing the `Option` drops
-/// (and thus stops) the previous one — only one workspace is watched at a
-/// time, matching the one-workspace-open-at-a-time UI.
 #[derive(Default)]
 pub struct WatcherState(pub Mutex<Option<WatcherHandle>>);
 
 #[tauri::command]
 pub fn watch_workspace(app: AppHandle, state: State<WatcherState>, root_path: String) -> Result<(), String> {
     let mut guard = state.0.lock().map_err(|_| "Watcher state is unavailable".to_string())?;
-    *guard = None; // stop watching the previous workspace, if any
+    *guard = None;
 
     let mut debouncer = new_debouncer(Duration::from_millis(DEBOUNCE_MS), move |res: DebounceEventResult| {
         if res.is_ok() {

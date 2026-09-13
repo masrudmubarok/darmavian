@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { listen } from "@tauri-apps/api/event";
 import type { SaveStatus } from "@/types/workspace";
 import { noteService } from "@/services/noteService";
 
@@ -6,7 +7,17 @@ interface OpenNote {
   path: string;
   title: string;
   content: string;
+  /** Last content confirmed to match what's on disk — the baseline for both
+   *  the dirty flag and external-change detection (plan §25). */
+  savedContent: string;
   isDirty: boolean;
+}
+
+export interface ExternalConflict {
+  path: string;
+  title: string;
+  localContent: string;
+  diskContent: string;
 }
 
 interface EditorState {
@@ -14,12 +25,16 @@ interface EditorState {
   activePath: string | null;
   saveStatus: SaveStatus;
   saveError: string | null;
+  conflict: ExternalConflict | null;
 
   openNote: (path: string) => Promise<void>;
   closeTab: (path: string) => void;
   setActive: (path: string) => void;
   updateContent: (path: string, content: string) => void;
   save: (path: string) => Promise<void>;
+  checkExternalChange: () => Promise<void>;
+  resolveConflictReload: () => void;
+  resolveConflictKeepCurrent: () => void;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -30,6 +45,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   activePath: null,
   saveStatus: "idle",
   saveError: null,
+  conflict: null,
 
   openNote: async (path: string) => {
     const existing = get().openTabs.find((t) => t.path === path);
@@ -39,7 +55,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
     const note = await noteService.open(path);
     set((state) => ({
-      openTabs: [...state.openTabs, { ...note, isDirty: false }],
+      openTabs: [...state.openTabs, { ...note, savedContent: note.content, isDirty: false }],
       activePath: path,
     }));
   },
@@ -60,7 +76,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   updateContent: (path: string, content: string) => {
     set((state) => ({
       openTabs: state.openTabs.map((t) =>
-        t.path === path ? { ...t, content, isDirty: true } : t,
+        t.path === path ? { ...t, content, isDirty: content !== t.savedContent } : t,
       ),
     }));
 
@@ -78,7 +94,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       await noteService.save(path, tab.content);
       set((state) => ({
         openTabs: state.openTabs.map((t) =>
-          t.path === path ? { ...t, isDirty: false } : t,
+          t.path === path ? { ...t, savedContent: t.content, isDirty: false } : t,
         ),
         saveStatus: "saved",
       }));
@@ -86,4 +102,61 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({ saveStatus: "error", saveError: String(err) });
     }
   },
+
+  checkExternalChange: async () => {
+    const { activePath, openTabs, conflict } = get();
+    if (!activePath || conflict) return;
+    const tab = openTabs.find((t) => t.path === activePath);
+    if (!tab) return;
+
+    let diskContent: string;
+    try {
+      diskContent = (await noteService.open(tab.path)).content;
+    } catch {
+      return;
+    }
+
+    if (diskContent === tab.savedContent) return;
+
+    if (tab.content === tab.savedContent) {
+      set((state) => ({
+        openTabs: state.openTabs.map((t) =>
+          t.path === tab.path ? { ...t, content: diskContent, savedContent: diskContent, isDirty: false } : t,
+        ),
+      }));
+      return;
+    }
+
+    if (diskContent === tab.content) {
+      set((state) => ({
+        openTabs: state.openTabs.map((t) => (t.path === tab.path ? { ...t, savedContent: diskContent } : t)),
+      }));
+      return;
+    }
+
+    set({
+      conflict: { path: tab.path, title: tab.title, localContent: tab.content, diskContent },
+    });
+  },
+
+  resolveConflictReload: () => {
+    const conflict = get().conflict;
+    if (!conflict) return;
+    set((state) => ({
+      openTabs: state.openTabs.map((t) =>
+        t.path === conflict.path
+          ? { ...t, content: conflict.diskContent, savedContent: conflict.diskContent, isDirty: false }
+          : t,
+      ),
+      conflict: null,
+    }));
+  },
+
+  resolveConflictKeepCurrent: () => {
+    set({ conflict: null });
+  },
 }));
+
+void listen("workspace://changed", () => {
+  void useEditorStore.getState().checkExternalChange();
+});

@@ -1,12 +1,19 @@
+import { useEffect } from "react";
 import { useUiStore } from "@/stores/uiStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { ExplorerPanel } from "@/features/explorer/ExplorerPanel";
 import { EditorPanel } from "@/features/editor/EditorPanel";
+import { ConflictModal } from "@/components/ConflictModal";
 
 export default function App() {
   const theme = useUiStore((s) => s.theme);
   const sidebarVisible = useUiStore((s) => s.sidebarVisible);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
+
+  useEffect(() => {
+    void useWorkspaceStore.getState().restoreLastWorkspace();
+  }, []);
 
   return (
     <div
@@ -45,6 +52,7 @@ export default function App() {
           <EditorPanel />
         </main>
       </div>
+      <ConflictModal />
     </div>
   );
 }

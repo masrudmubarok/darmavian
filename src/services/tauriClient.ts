@@ -28,4 +28,22 @@ export const tauriClient = {
     invoke<void>("watch_workspace", { rootPath }),
 
   unwatchWorkspace: () => invoke<void>("unwatch_workspace"),
+
+  readAssetDataUrl: (path: string) =>
+    invoke<string>("read_asset_data_url", { path }),
+
+  importFiles: (targetFolder: string, sourcePaths: string[]) =>
+    invoke<void>("import_files", { targetFolder, sourcePaths }),
+
+  importFolder: (targetFolder: string, sourceFolder: string) =>
+    invoke<string>("import_folder", { targetFolder, sourceFolder }),
+
+  importZip: (targetFolder: string, zipPath: string) =>
+    invoke<string>("import_zip", { targetFolder, zipPath }),
+
+  exportNote: (sourcePath: string, destPath: string) =>
+    invoke<void>("export_note", { sourcePath, destPath }),
+
+  exportZip: (sourceFolder: string, destZipPath: string) =>
+    invoke<void>("export_zip", { sourceFolder, destZipPath }),
 };

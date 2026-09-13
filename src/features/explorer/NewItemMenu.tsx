@@ -3,6 +3,7 @@ import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useEditorStore } from "@/stores/editorStore";
 import { noteService } from "@/services/noteService";
 import { folderService } from "@/services/folderService";
+import { importExportService } from "@/services/importExportService";
 import { PromptModal } from "@/components/PromptModal";
 
 interface Props {
@@ -11,7 +12,11 @@ interface Props {
 
 type PendingAction = "note" | "folder" | null;
 
-/** "+" button next to the workspace header: quick New Note / New Folder at the workspace root. */
+function folderName(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).pop() ?? "workspace";
+}
+
+/** "+" button next to the workspace header: New Note/Folder and Import/Export at the workspace root. */
 export function NewItemMenu({ rootPath }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<PendingAction>(null);
@@ -47,6 +52,18 @@ export function NewItemMenu({ rootPath }: Props) {
     }
   };
 
+  const runImport = async (fn: () => Promise<boolean>) => {
+    setError(null);
+    try {
+      const didImport = await fn();
+      if (didImport) await refreshTree();
+    } catch (err) {
+      setError(String(err));
+      return;
+    }
+    setOpen(false);
+  };
+
   return (
     <div ref={ref} className="relative">
       <button
@@ -62,7 +79,7 @@ export function NewItemMenu({ rootPath }: Props) {
         +
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-md border border-border bg-surface py-1 shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-1 min-w-[190px] rounded-md border border-border bg-surface py-1 shadow-lg">
           {error && (
             <div className="border-b border-border px-3 py-1.5 text-xs text-red-400">
               {error}
@@ -81,6 +98,40 @@ export function NewItemMenu({ rootPath }: Props) {
             className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-surface-alt"
           >
             <span>📁</span> New Folder
+          </button>
+          <div className="my-1 border-t border-border" />
+          <button
+            type="button"
+            onClick={() => void runImport(() => importExportService.importFiles(rootPath))}
+            className="block w-full px-3 py-1.5 text-left text-sm hover:bg-surface-alt"
+          >
+            Import Files…
+          </button>
+          <button
+            type="button"
+            onClick={() => void runImport(() => importExportService.importFolder(rootPath))}
+            className="block w-full px-3 py-1.5 text-left text-sm hover:bg-surface-alt"
+          >
+            Import Folder…
+          </button>
+          <button
+            type="button"
+            onClick={() => void runImport(() => importExportService.importZip(rootPath))}
+            className="block w-full px-3 py-1.5 text-left text-sm hover:bg-surface-alt"
+          >
+            Import ZIP…
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              void importExportService
+                .exportZip(rootPath, folderName(rootPath))
+                .catch((err) => setError(String(err)));
+            }}
+            className="block w-full px-3 py-1.5 text-left text-sm hover:bg-surface-alt"
+          >
+            Export Workspace as ZIP…
           </button>
         </div>
       )}

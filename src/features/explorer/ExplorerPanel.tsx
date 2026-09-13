@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { workspaceService } from "@/services/workspaceService";
-import { ExplorerTree } from "./ExplorerTree";
+import { noteService } from "@/services/noteService";
+import { folderService } from "@/services/folderService";
+import { ExplorerTree, DND_MIME, type DraggedNode } from "./ExplorerTree";
 import { ContextMenu } from "./ContextMenu";
 import { NewItemMenu } from "./NewItemMenu";
 
@@ -14,6 +17,8 @@ export function ExplorerPanel() {
   const isLoading = useWorkspaceStore((s) => s.isLoading);
   const error = useWorkspaceStore((s) => s.error);
   const openWorkspace = useWorkspaceStore((s) => s.openWorkspace);
+  const refreshTree = useWorkspaceStore((s) => s.refreshTree);
+  const [rootDragOver, setRootDragOver] = useState(false);
 
   const handlePick = async () => {
     const path = await workspaceService.pickWorkspace();
@@ -41,7 +46,32 @@ export function ExplorerPanel() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-1 py-2">
+      <div
+        className={`flex-1 overflow-y-auto px-1 py-2 ${rootDragOver ? "bg-surface-alt" : ""}`}
+        onDragOver={(e) => {
+          if (!rootPath || !e.dataTransfer.types.includes(DND_MIME)) return;
+          e.preventDefault();
+          setRootDragOver(true);
+        }}
+        onDragLeave={() => setRootDragOver(false)}
+        onDrop={(e) => {
+          setRootDragOver(false);
+          if (!rootPath) return;
+          const raw = e.dataTransfer.getData(DND_MIME);
+          if (!raw) return;
+          e.preventDefault();
+          const dragged = JSON.parse(raw) as DraggedNode;
+          void (async () => {
+            try {
+              if (dragged.kind === "folder") await folderService.move(dragged.path, rootPath);
+              else await noteService.move(dragged.path, rootPath);
+              await refreshTree();
+            } catch (err) {
+              useWorkspaceStore.setState({ error: String(err) });
+            }
+          })();
+        }}
+      >
         {!rootPath && (
           <p className="px-2 text-sm opacity-60">
             No workspace open. Click "Open…" to choose a folder.

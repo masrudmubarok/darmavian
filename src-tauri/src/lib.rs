@@ -18,6 +18,12 @@ pub fn run() {
             commands::entry::rename_entry,
             commands::entry::move_entry,
             commands::entry::delete_entry,
+            commands::asset::read_asset_data_url,
+            commands::import_export::import_files,
+            commands::import_export::import_folder,
+            commands::import_export::import_zip,
+            commands::import_export::export_note,
+            commands::import_export::export_zip,
             watcher::watch_workspace,
             watcher::unwatch_workspace,
         ])

@@ -2,10 +2,12 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import DOMPurify from "dompurify";
 import { md } from "./markdownRenderer";
 import type { ScrollSyncHandle } from "@/features/editor/CodeMirrorEditor";
+import { assetService } from "@/services/assetService";
+import { dirname } from "@/utils/path";
 
 const SANITIZE_OPTIONS = {
   ADD_TAGS: ["foreignObject"],
-  ADD_ATTR: ["target", "data-line"],
+  ADD_ATTR: ["target", "data-line", "data-relsrc"],
 };
 
 function useDebounced<T>(value: T, delayMs: number): T {
@@ -38,12 +40,14 @@ function collectLineOffsets(root: HTMLElement, scrollRoot: HTMLElement): LineOff
 
 interface Props {
   content: string;
+  /** The open note's own path — local image references resolve relative to its folder. */
+  notePath?: string;
   /** Fractional 0-indexed source line currently at the top of the viewport. */
   onScroll?: (line: number) => void;
 }
 
 export const PreviewPane = forwardRef<ScrollSyncHandle, Props>(function PreviewPane(
-  { content, onScroll },
+  { content, notePath, onScroll },
   ref,
 ) {
   const debouncedContent = useDebounced(content, 200);
@@ -77,9 +81,28 @@ export const PreviewPane = forwardRef<ScrollSyncHandle, Props>(function PreviewP
   }));
 
   useEffect(() => {
-    const rendered = md.render(debouncedContent);
+    const rendered = md.render(debouncedContent, { baseDir: notePath ? dirname(notePath) : "" });
     setHtml(DOMPurify.sanitize(rendered, SANITIZE_OPTIONS));
-  }, [debouncedContent]);
+  }, [debouncedContent, notePath]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const images = container.querySelectorAll<HTMLImageElement>("img[data-relsrc]");
+    images.forEach((img) => {
+      const path = img.getAttribute("data-relsrc");
+      if (!path) return;
+      assetService
+        .readAsDataUrl(path)
+        .then((dataUrl) => {
+          img.src = dataUrl;
+        })
+        .catch(() => {
+          img.alt = `${img.alt} (missing: ${path})`;
+        })
+        .finally(refreshLineOffsets);
+    });
+  }, [html]);
 
   useEffect(() => {
     refreshLineOffsets();
@@ -96,12 +119,6 @@ export const PreviewPane = forwardRef<ScrollSyncHandle, Props>(function PreviewP
 
       const root = getComputedStyle(document.documentElement);
       const fontFamily = root.getPropertyValue("--font-reading").trim();
-      // Mermaid's built-in "neutral" theme is the standard, well-tested
-      // palette for embedding diagrams in documentation (muted blue-gray
-      // nodes, black text, gray edges) — used as-is rather than a custom
-      // palette. It's designed for a light card, which `.darmavian-prose
-      // pre.mermaid` provides with a fixed white background regardless of
-      // the app's own dark/light theme, so contrast is always correct.
       mermaid.initialize({
         startOnLoad: false,
         securityLevel: "strict",

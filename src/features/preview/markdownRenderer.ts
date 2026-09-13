@@ -1,5 +1,10 @@
 import MarkdownIt from "markdown-it";
 import hljs from "highlight.js";
+import { resolveRelativePath } from "@/utils/path";
+
+export interface RenderEnv {
+  baseDir?: string;
+}
 
 export const md: InstanceType<typeof MarkdownIt> = new MarkdownIt({
   html: true,
@@ -32,6 +37,22 @@ md.renderer.rules.fence = (tokens, idx) => {
     }
   }
   return `<pre class="hljs"${dataLineAttr}><code>${md.utils.escapeHtml(token.content)}</code></pre>`;
+};
+
+const REMOTE_SRC_RE = /^([a-z][a-z0-9+.-]*:)?\/\//i;
+
+md.renderer.rules.image = (tokens, idx, _options, envUntyped) => {
+  const env = envUntyped as RenderEnv;
+  const token = tokens[idx];
+  const src = String(token.attrGet("src") ?? "");
+  const alt = String(token.content ?? "");
+  const isRemote = REMOTE_SRC_RE.test(src) || src.startsWith("data:");
+
+  if (isRemote) {
+    return `<img src="${md.utils.escapeHtml(src)}" alt="${md.utils.escapeHtml(alt)}" />`;
+  }
+  const resolved = resolveRelativePath(env?.baseDir ?? "", src);
+  return `<img data-relsrc="${md.utils.escapeHtml(resolved)}" alt="${md.utils.escapeHtml(alt)}" />`;
 };
 
 md.renderer.rules.table_open = (tokens, idx) => {

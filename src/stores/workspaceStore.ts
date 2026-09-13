@@ -3,6 +3,8 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { WorkspaceNode } from "@/types/workspace";
 import { workspaceService } from "@/services/workspaceService";
 
+const LAST_WORKSPACE_KEY = "darmavian:lastWorkspace";
+
 interface WorkspaceState {
   rootPath: string | null;
   tree: WorkspaceNode[];
@@ -13,10 +15,9 @@ interface WorkspaceState {
   openWorkspace: (rootPath: string) => Promise<void>;
   refreshTree: () => Promise<void>;
   toggleExpanded: (path: string) => void;
+  restoreLastWorkspace: () => Promise<void>;
 }
 
-// Module-scoped rather than in the store's state: it's plumbing for the
-// external-change subscription (plan §25), not something the UI reads.
 let stopWatching: UnlistenFn | null = null;
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
@@ -32,9 +33,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const tree = await workspaceService.readTree(rootPath);
       set({ rootPath, tree, isLoading: false });
 
-      // Replace any previous workspace's subscription with this one, so a
-      // file created/edited/deleted outside the app (Explorer, VS Code,
-      // git, …) is reflected in the sidebar without user action.
+      try {
+        localStorage.setItem(LAST_WORKSPACE_KEY, rootPath);
+      } catch {
+        // Private window / storage disabled — silently skip remembering it.
+      }
+      
       stopWatching?.();
       stopWatching = null;
       await workspaceService.watch(rootPath);
@@ -64,5 +68,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       else next.add(path);
       return { expandedPaths: next };
     });
+  },
+
+  restoreLastWorkspace: async () => {
+    let last: string | null = null;
+    try {
+      last = localStorage.getItem(LAST_WORKSPACE_KEY);
+    } catch {
+      return;
+    }
+    if (last) await get().openWorkspace(last);
   },
 }));

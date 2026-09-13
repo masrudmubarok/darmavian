@@ -27,7 +27,9 @@ export function StatusBar() {
         {saveStatus === "error" && saveError ? ` — ${saveError}` : ""}
       </span>
       <span>
-        {activeTab ? `Markdown · ${wordCount(activeTab.content)} words · UTF-8` : ""}
+        {activeTab
+          ? `Markdown · ${wordCount(activeTab.content)} words · ${activeTab.content.length} characters · UTF-8`
+          : ""}
       </span>
     </div>
   );

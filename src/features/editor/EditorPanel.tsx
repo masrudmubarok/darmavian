@@ -1,6 +1,8 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useEditorStore } from "@/stores/editorStore";
 import { useUiStore } from "@/stores/uiStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { flattenNotes } from "@/utils/tree";
 import { CodeMirrorEditor, type ScrollSyncHandle } from "./CodeMirrorEditor";
 import { EditorTabs } from "./EditorTabs";
 import { StatusBar } from "./StatusBar";
@@ -12,6 +14,8 @@ export function EditorPanel() {
   const activePath = useEditorStore((s) => s.activePath);
   const updateContent = useEditorStore((s) => s.updateContent);
   const viewMode = useUiStore((s) => s.viewMode);
+  const tree = useWorkspaceStore((s) => s.tree);
+  const noteRefs = useMemo(() => flattenNotes(tree), [tree]);
 
   const activeTab = openTabs.find((t) => t.path === activePath);
   const showEditor = activeTab && (viewMode === "editor" || viewMode === "split");
@@ -65,12 +69,18 @@ export function EditorPanel() {
               value={activeTab!.content}
               onChange={(content) => updateContent(activeTab!.path, content)}
               onScroll={handleEditorScroll}
+              noteRefs={noteRefs}
             />
           </div>
         )}
         {showPreview && (
           <div className={viewMode === "split" ? "w-1/2 min-w-0 overflow-hidden" : "w-full min-w-0 overflow-hidden"}>
-            <PreviewPane ref={previewRef} content={activeTab!.content} onScroll={handlePreviewScroll} />
+            <PreviewPane
+              ref={previewRef}
+              content={activeTab!.content}
+              notePath={activeTab!.path}
+              onScroll={handlePreviewScroll}
+            />
           </div>
         )}
       </div>
