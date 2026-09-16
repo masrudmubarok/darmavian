@@ -1,7 +1,6 @@
 //! Reveals a note or folder in the OS file manager. Spawned directly via
 //! `Command::new` (never through a shell), so there's no shell-injection
-//! surface even though the path is user-controlled — Windows still parses
-//! `/select,<path>` as a single argument correctly this way.
+//! surface even though the path is user-controlled.
 use std::path::Path;
 use std::process::Command;
 
@@ -14,8 +13,15 @@ pub fn reveal_in_file_manager(path: String) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
+        let canonical = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+        let native = canonical
+            .to_string_lossy()
+            .replace('/', "\\")
+            .trim_start_matches(r"\\?\")
+            .to_string();
         Command::new("explorer")
-            .arg(format!("/select,{path}"))
+            .raw_arg(format!("/select,\"{native}\""))
             .spawn()
             .map_err(|e| format!("Cannot open Explorer: {e}"))?;
     }

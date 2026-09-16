@@ -38,7 +38,7 @@ export function ExplorerPanel() {
           <button
             type="button"
             onClick={handlePick}
-            className="rounded px-2 py-0.5 text-xs hover:bg-surface-alt"
+            className="rounded border border-border px-2 py-0.5 text-xs hover:bg-surface-alt"
           >
             Open…
           </button>
