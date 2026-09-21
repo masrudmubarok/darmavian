@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useUiStore } from "@/stores/uiStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { useEditorStore } from "@/stores/editorStore";
 import { ExplorerPanel } from "@/features/explorer/ExplorerPanel";
 import { EditorPanel } from "@/features/editor/EditorPanel";
 import { ConflictModal } from "@/components/ConflictModal";
@@ -16,7 +17,10 @@ export default function App() {
   const toggleTheme = useUiStore((s) => s.toggleTheme);
 
   useEffect(() => {
-    void useWorkspaceStore.getState().restoreLastWorkspace();
+    void (async () => {
+      await useWorkspaceStore.getState().restoreLastWorkspace();
+      await useEditorStore.getState().restoreSession();
+    })();
   }, []);
 
   return (

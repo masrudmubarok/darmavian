@@ -4,6 +4,17 @@ import type { WorkspaceNode } from "@/types/workspace";
 import { workspaceService } from "@/services/workspaceService";
 
 const LAST_WORKSPACE_KEY = "darmavian:lastWorkspace";
+const EXPANDED_PATHS_KEY = "darmavian:expandedPaths";
+
+function readExpandedPaths(): Set<string> {
+  try {
+    const raw = localStorage.getItem(EXPANDED_PATHS_KEY);
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw) as string[]);
+  } catch {
+    return new Set();
+  }
+}
 
 interface WorkspaceState {
   rootPath: string | null;
@@ -31,14 +42,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const tree = await workspaceService.readTree(rootPath);
-      set({ rootPath, tree, isLoading: false });
+      set({ rootPath, tree, isLoading: false, expandedPaths: readExpandedPaths() });
 
       try {
         localStorage.setItem(LAST_WORKSPACE_KEY, rootPath);
       } catch {
         // Private window / storage disabled — silently skip remembering it.
       }
-      
+
       stopWatching?.();
       stopWatching = null;
       await workspaceService.watch(rootPath);
@@ -66,6 +77,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const next = new Set(state.expandedPaths);
       if (next.has(path)) next.delete(path);
       else next.add(path);
+      try {
+        localStorage.setItem(EXPANDED_PATHS_KEY, JSON.stringify([...next]));
+      } catch {
+        // Private window / storage disabled — silently skip remembering it.
+      }
       return { expandedPaths: next };
     });
   },

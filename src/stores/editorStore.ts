@@ -35,10 +35,12 @@ interface EditorState {
   checkExternalChange: () => Promise<void>;
   resolveConflictReload: () => void;
   resolveConflictKeepCurrent: () => void;
+  restoreSession: () => Promise<void>;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 const AUTOSAVE_DEBOUNCE_MS = 500;
+const SESSION_KEY = "darmavian:session";
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   openTabs: [],
@@ -155,8 +157,56 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   resolveConflictKeepCurrent: () => {
     set({ conflict: null });
   },
+
+  restoreSession: async () => {
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(SESSION_KEY);
+    } catch {
+      return;
+    }
+    if (!raw) return;
+
+    let saved: { paths: string[]; activePath: string | null };
+    try {
+      saved = JSON.parse(raw);
+    } catch {
+      return;
+    }
+
+    const tabs: OpenNote[] = [];
+    for (const path of saved.paths ?? []) {
+      try {
+        const note = await noteService.open(path);
+        tabs.push({ ...note, savedContent: note.content, isDirty: false });
+      } catch {
+        // File was deleted/moved outside the app since the last session — drop its tab.
+      }
+    }
+    if (tabs.length === 0) return;
+
+    const activePath = tabs.some((t) => t.path === saved.activePath)
+      ? saved.activePath
+      : tabs[tabs.length - 1].path;
+    set({ openTabs: tabs, activePath });
+  },
 }));
 
 void listen("workspace://changed", () => {
   void useEditorStore.getState().checkExternalChange();
+});
+
+let lastSessionSignature = "";
+useEditorStore.subscribe((state) => {
+  const signature = JSON.stringify({
+    paths: state.openTabs.map((t) => t.path),
+    activePath: state.activePath,
+  });
+  if (signature === lastSessionSignature) return;
+  lastSessionSignature = signature;
+  try {
+    localStorage.setItem(SESSION_KEY, signature);
+  } catch {
+    // Private window / storage disabled — silently skip remembering it.
+  }
 });
