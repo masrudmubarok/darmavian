@@ -61,3 +61,31 @@ md.renderer.rules.table_open = (tokens, idx) => {
   return `<div class="darmavian-table-wrap"${attr}><table>`;
 };
 md.renderer.rules.table_close = () => "</table></div>";
+
+const BLOCK_CLOSE_GLUE_RE = /(<\/(?:div|table|blockquote|ul|ol|section|article)>)(?=\S)/g;
+
+function normalizeGluedHtmlBlocks(src: string): string {
+  return src.replace(BLOCK_CLOSE_GLUE_RE, "$1\n\n");
+}
+
+function markdownEmphasisToHtml(text: string): string {
+  return text
+    .replace(/\\--&gt;/g, "-->")
+    .replace(/\\#/g, "#")
+    .replace(/\\\[/g, "[")
+    .replace(/\\\]/g, "]")
+    .replace(/\*\*([^\n*]+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^\n*]+?)\*/g, "<em>$1</em>");
+}
+
+md.core.ruler.push("humanize_raw_html_blocks", (state) => {
+  for (const token of state.tokens) {
+    if (token.type === "html_block") {
+      token.content = markdownEmphasisToHtml(token.content);
+    }
+  }
+});
+
+export function renderMarkdown(src: string, env?: RenderEnv): string {
+  return md.render(normalizeGluedHtmlBlocks(src), env as Record<string, unknown>);
+}

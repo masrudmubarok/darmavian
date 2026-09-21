@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import DOMPurify from "dompurify";
-import { md } from "./markdownRenderer";
+import { renderMarkdown } from "./markdownRenderer";
 import type { ScrollSyncHandle } from "@/features/editor/CodeMirrorEditor";
 import { assetService } from "@/services/assetService";
 import { dirname } from "@/utils/path";
@@ -81,7 +81,7 @@ export const PreviewPane = forwardRef<ScrollSyncHandle, Props>(function PreviewP
   }));
 
   useEffect(() => {
-    const rendered = md.render(debouncedContent, { baseDir: notePath ? dirname(notePath) : "" });
+    const rendered = renderMarkdown(debouncedContent, { baseDir: notePath ? dirname(notePath) : "" });
     setHtml(DOMPurify.sanitize(rendered, SANITIZE_OPTIONS));
   }, [debouncedContent, notePath]);
 
