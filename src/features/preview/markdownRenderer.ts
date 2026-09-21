@@ -55,6 +55,18 @@ md.renderer.rules.image = (tokens, idx, _options, envUntyped) => {
   return `<img data-relsrc="${md.utils.escapeHtml(resolved)}" alt="${md.utils.escapeHtml(alt)}" />`;
 };
 
+const defaultLinkOpen =
+  md.renderer.rules.link_open ??
+  ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
+
+md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+  const href = String(tokens[idx].attrGet("href") ?? "");
+  if (REMOTE_SRC_RE.test(href)) {
+    tokens[idx].attrSet("title", "Open in browser");
+  }
+  return defaultLinkOpen(tokens, idx, options, env, self);
+};
+
 md.renderer.rules.table_open = (tokens, idx) => {
   const line = tokens[idx].attrGet("data-line");
   const attr = line !== null ? ` data-line="${line}"` : "";

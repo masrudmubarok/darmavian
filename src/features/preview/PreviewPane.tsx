@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import DOMPurify from "dompurify";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { renderMarkdown } from "./markdownRenderer";
 import type { ScrollSyncHandle } from "@/features/editor/CodeMirrorEditor";
 import { assetService } from "@/services/assetService";
@@ -136,6 +137,15 @@ export const PreviewPane = forwardRef<ScrollSyncHandle, Props>(function PreviewP
     };
   }, [html]);
 
+  const handleContentClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const anchor = (e.target as HTMLElement).closest("a[href]");
+    if (!anchor) return;
+    const href = anchor.getAttribute("href");
+    if (!href || href.startsWith("#")) return;
+    e.preventDefault();
+    void openUrl(href).catch((err) => console.error("Failed to open link:", err));
+  };
+
   const handleScroll = () => {
     const el = scrollRef.current;
     const offsets = lineOffsetsRef.current;
@@ -158,6 +168,7 @@ export const PreviewPane = forwardRef<ScrollSyncHandle, Props>(function PreviewP
       <div
         ref={containerRef}
         className="darmavian-prose px-8 py-6"
+        onClick={handleContentClick}
         dangerouslySetInnerHTML={{ __html: html }}
       />
     </div>
